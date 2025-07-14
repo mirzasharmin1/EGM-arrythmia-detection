@@ -4,3 +4,4 @@ scikit-learn
 jupyter
 torch
 matplotlib
+scipy
