@@ -5,3 +5,4 @@ jupyter
 torch
 matplotlib
 scipy
+imblearn

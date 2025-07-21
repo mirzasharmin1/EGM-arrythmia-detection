@@ -1,77 +1,37 @@
 from scipy import signal
-import numpy as np
 
 
-def downsample_df(data_df, target_freq):
-    """
-    Downsample DataFrame using pandas operations
+def downsample_df(data_df, original_freq=2000, target_freq=400):
+    # Calculate sampling factor
+    decimation_factor = original_freq // target_freq
 
-    Args:
-        data_df: Input DataFrame with time and signal columns
-        target_freq: Target frequency (e.g., 400 Hz)
-
-    Returns:
-        Downsampled DataFrame
-    """
-
-    # Calculate downsampling factor (how many samples to group together)
-    factor = 2_000 // target_freq
-
-    # Get signal columns (skip first 4 columns which are time columns)
+    # Get signal columns
     signal_columns = list(data_df.columns)[4:]
 
-    # Create group numbers within each second
-    # This replaces your manual loop through seconds
-    data_df_copy = data_df.copy()
-    data_df_copy['group_within_second'] = data_df_copy.groupby('t_secs').cumcount() // factor
+    # First downsample time columns by taking every nth row
+    result_df = data_df.iloc[::decimation_factor].copy().reset_index(drop=True)
 
-    # Create unique group identifier combining second and group number
-    # This replaces your second_indexed_data dictionary
-    data_df_copy['group_id'] = (data_df_copy['t_secs'].astype(str) + '_' +
-                                data_df_copy['group_within_second'].astype(str))
-
-    # Define aggregation rules for different column types
-    agg_rules = {}
-
-    # Keep the second value (equivalent to your t_sec in downsampled_row)
-    agg_rules['t_secs'] = 'first'
-
-    # Average all signal columns (equivalent to your sum then divide by factor)
+    # Then downsample each signal column using scipy.signal.decimate
     for col in signal_columns:
-        agg_rules[col] = 'mean'
+        # Use scipy.signal.decimate (handles anti-aliasing automatically)
+        downsampled_signal = signal.decimate(data_df[col].values, decimation_factor)
 
-    # Group by the unique identifier and apply aggregation
-    # This replaces your nested loops and manual averaging
-    downsampled_df = data_df_copy.groupby('group_id').agg(agg_rules).reset_index(drop=True)
+        # Update the column with downsampled data
+        result_df[col] = downsampled_signal
 
-    # Rename t_secs to t_sec to match your original output
-    downsampled_df = downsampled_df.rename(columns={'t_secs': 't_sec'})
-
-    return downsampled_df
+    return result_df
 
 
-def downsample_data(data_index, target_freq):
+def downsample_data(data_index, original_freq=2000, target_freq=400):
     downsampled_data = {}
 
-    for key, (_, unipolar_df) in data_index.items():
-        downsampled_data[key] = downsample_df(unipolar_df, target_freq)
+    for key, unipolar_df in data_index.items():
+        downsampled_data[key] = downsample_df(unipolar_df, original_freq, target_freq)
 
     return downsampled_data
 
 
 def filter_egm_lowpass(data, fs=400, cutoff=50, order=4):
-    """
-    Apply low-pass Butterworth filter to remove high-frequency noise
-
-    Args:
-        data: EGM signal data (1D array or pandas Series)
-        fs: Sampling frequency (400 Hz)
-        cutoff: Cutoff frequency in Hz (50 Hz removes high freq noise)
-        order: Filter order (higher = steeper rolloff)
-
-    Returns:
-        Filtered signal
-    """
     # Calculate Nyquist frequency
     nyquist = fs / 2
 

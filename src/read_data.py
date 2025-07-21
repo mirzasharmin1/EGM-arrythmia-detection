@@ -89,9 +89,9 @@ def read_all_data(base_dir):
             unipolar_df = unipolar_df.dropna()
 
             if is_fibrillation:
-                patient_dfs[matching_dir] = (ecg_df, unipolar_df)
+                patient_dfs[matching_dir] = unipolar_df
             else:
-                sinus_dfs[matching_dir] = (ecg_df, unipolar_df)
+                sinus_dfs[matching_dir] = unipolar_df
         else:
             print(f'Directory for patient {patient_id} not found with timestamp {timestamp}')
 
