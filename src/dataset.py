@@ -11,7 +11,7 @@ from imblearn.over_sampling import SMOTE
 class EGMDataset(Dataset):
     def __init__(self, data, labels):
         # data List of numpy arrays, each of shape (1600, 32)
-        # labels List of integers (1 for sinus, 0 for patient)
+        # labels List of integers (0 for sinus, 1 for patient)
         self.data = data
         self.labels = labels
 
@@ -21,7 +21,7 @@ class EGMDataset(Dataset):
     def __getitem__(self, idx):
         # convert to torch tensors
         segment = torch.tensor(self.data[idx], dtype=torch.float32)
-        label = torch.tensor([self.labels[idx]], dtype=torch.float32)
+        label = torch.tensor(self.labels[idx], dtype=torch.float32)
 
         return segment, label
 

@@ -5,7 +5,8 @@ from torch import nn, optim
 from torch.utils.data import DataLoader
 
 from src.dataset import EGMDataset, oversample_with_smote
-from src.model import EGMTransformer
+from src.model_cnn import EGMCNN
+from src.model_transformer import EGMTransformer
 
 
 class EarlyStopping:
@@ -34,13 +35,13 @@ class EarlyStopping:
 
 
 def train_model(model, train_loader, test_loader, num_epochs, device='cpu', patience=5):
-
     # Training function with early stopping
     print(f"\n=== Training Setup ===")
     print(f"Device: {device}")
     print(f"Early stopping patience: {patience} epochs")
 
     criterion = nn.BCEWithLogitsLoss()
+
     optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
 
@@ -66,7 +67,7 @@ def train_model(model, train_loader, test_loader, num_epochs, device='cpu', pati
             labels = labels.float().to(device)
 
             optimizer.zero_grad()
-            outputs = model(segments)
+            outputs = model(segments).squeeze()
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
@@ -87,7 +88,7 @@ def train_model(model, train_loader, test_loader, num_epochs, device='cpu', pati
                 segments = segments.to(device)
                 labels = labels.float().to(device)
 
-                outputs = model(segments)
+                outputs = model(segments).squeeze()
                 loss = criterion(outputs, labels)
 
                 test_loss += loss.item()
@@ -151,7 +152,7 @@ def predict_and_evaluate(model, data, labels, device='cpu', batch_size=32):
             batch_labels = batch_labels.float().to(device)
 
             # Forward pass
-            outputs = model(segments)
+            outputs = model(segments).squeeze()
             loss = criterion(outputs, batch_labels)
             total_loss += loss.item()
 
@@ -203,10 +204,36 @@ def predict_and_evaluate(model, data, labels, device='cpu', batch_size=32):
         'probabilities': all_probabilities
     }
 
-def run_training_pipeline(train_data, train_labels, valid_data, valid_labels, device, patience=5):
+
+def create_model(model_type):
+    if model_type == 'transformer':
+        model = EGMTransformer(
+            input_dim=32,
+            d_model=128,
+            num_layers=3,
+            n_head=8,
+            dropout=0.2
+        )
+    else:
+        model = EGMCNN(dropout=0.2)
+
+    return model
+
+
+def run_training_pipeline(train_data, train_labels, valid_data, valid_labels, device, model_type, use_smote=True, patience=5):
     print("Starting EGM Classification Pipeline")
 
-    train_data_balanced, train_labels_balanced = oversample_with_smote(train_data, train_labels)
+    if use_smote:
+        train_data_balanced, train_labels_balanced = oversample_with_smote(train_data, train_labels)
+    else:
+        train_data_balanced, train_labels_balanced = train_data, train_labels
+
+    # Print class distribution when not using SMOTE
+    sinus_count = train_labels.count(0)
+    patient_count = train_labels.count(1)
+    print(f"Training data distribution:")
+    print(f"  Sinus: {sinus_count} segments ({sinus_count / len(train_labels) * 100:.1f}%)")
+    print(f"  Patient: {patient_count} segments ({patient_count / len(train_labels) * 100:.1f}%)")
 
     # Create datasets and dataloaders
     train_dataset = EGMDataset(train_data_balanced, train_labels_balanced)
@@ -221,14 +248,7 @@ def run_training_pipeline(train_data, train_labels, valid_data, valid_labels, de
     print(f"Test batches: {len(valid_loader)}")
 
     # Create model
-    model = EGMTransformer(
-        input_dim=32,
-        d_model=128,
-        num_layers=3,
-        n_head=8,
-        num_classes=1,
-        dropout=0.2
-    )
+    model = create_model(model_type)
 
     print(f"\nModel created with {sum(p.numel() for p in model.parameters()):,} parameters")
 
