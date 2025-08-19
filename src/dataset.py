@@ -56,7 +56,7 @@ def oversample_with_smote(train_data, train_labels, random_state=42):
 
 
 # Data Preparation
-def prepare_data(patient_segments, sinus_segments, train_ratio=0.7, valid_ratio=0.15, test_ratio=0.15, random_state=42):
+def prepare_data(patient_segments, sinus_segments, train_ratio=0.6, valid_ratio=0.2, test_ratio=0.2, random_state=42):
     patient_files = list(patient_segments.keys())
     sinus_files = list(sinus_segments.keys())
 

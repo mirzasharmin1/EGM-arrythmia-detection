@@ -34,7 +34,7 @@ class EarlyStopping:
         return False
 
 
-def train_model(model, train_loader, test_loader, num_epochs, device='cpu', patience=5):
+def train_model(model, train_loader, test_loader, num_epochs, device='cpu', patience=7):
     # Training function with early stopping
     print(f"\n=== Training Setup ===")
     print(f"Device: {device}")
@@ -42,11 +42,13 @@ def train_model(model, train_loader, test_loader, num_epochs, device='cpu', pati
 
     criterion = nn.BCEWithLogitsLoss()
 
-    optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
+    optimizer = optim.Adam(model.parameters(), lr=0.005, weight_decay=1e-4)  # 5x higher
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.7, patience=3
+    )
 
     # Initialize early stopping
-    early_stopping = EarlyStopping(patience=patience, min_delta=0.001)
+    early_stopping = EarlyStopping(patience=patience, min_delta=0.01)
 
     model.to(device)
 
@@ -108,7 +110,7 @@ def train_model(model, train_loader, test_loader, num_epochs, device='cpu', pati
             print(f"Best validation loss: {early_stopping.best_loss:.4f}")
             break
 
-        scheduler.step()
+        scheduler.step(avg_test_loss)
 
         print(f'Epoch [{epoch + 1}/{num_epochs}]:')
         print(f'  Train Loss: {avg_train_loss:.4f}, Train Acc: {train_acc:.2f}%')
@@ -214,13 +216,15 @@ def create_model(model_type):
             n_head=8,
             dropout=0.2
         )
-    else:
+    elif model_type == 'cnn':
         model = EGMCNN(dropout=0.2)
+    else:
+        raise ValueError(f"Invalid model type")
 
     return model
 
 
-def run_training_pipeline(train_data, train_labels, valid_data, valid_labels, device, model_type, use_smote=True, patience=5):
+def run_training_pipeline(train_data, train_labels, valid_data, valid_labels, device, model_type, use_smote=True, patience=7):
     print("Starting EGM Classification Pipeline")
 
     if use_smote:
